@@ -1,0 +1,58 @@
+name: 'Setup SSH'
+description: 'Setup SSH for a remote server using an ssh tunnel/bastion host/jump box.'
+inputs:
+  SSH_HOSTNAME:
+    required: true
+  SSH_USERNAME:
+    required: true
+  SSH_PRIVATE_KEY:
+    required: true
+  SSH_KNOWN_HOSTS:
+    required: true
+  VPN_HOSTNAME:
+    required: true
+  VPN_USERNAME:
+    required: true
+  VPN_PRIVATE_KEY:
+    required: true
+  VPN_KNOWN_HOSTS:
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Install SSH key of bastion'
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ inputs.VPN_PRIVATE_KEY }}
+        name: id_rsa-bastion
+        known_hosts: ${{ inputs.VPN_KNOWN_HOSTS }}
+        config: |
+          Host ${{ inputs.VPN_HOSTNAME }}
+            HostName ${{ inputs.VPN_HOSTNAME }}
+            User ${{ inputs.VPN_USERNAME }}
+            IdentityFile /root/.ssh/id_rsa-bastion
+    - name: 'Install SSH key of target'
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ inputs.SSH_PRIVATE_KEY }}
+        name: id_rsa-target
+        known_hosts: ${{ inputs.SSH_KNOWN_HOSTS }}
+        config: |
+          Host ${{ inputs.SSH_HOSTNAME }}
+            HostName ${{ inputs.SSH_HOSTNAME }}
+            User ${{ inputs.SSH_USERNAME }}
+            IdentityFile /root/.ssh/id_rsa-target
+            ProxyCommand ssh -W %h:%p ${{ inputs.VPN_HOSTNAME }}
+    - name: 'SSH Verify Config'
+      shell: bash
+      run: |
+        cat /root/.ssh/config
+    - name: 'SSH Verify Known Hosts'
+      shell: bash
+      run: |
+        cat /root/.ssh/known_hosts
+    - name: 'SSH Test'
+      shell: bash
+      run: |
+        ssh ${{ inputs.SSH_HOSTNAME }} "hostname"
+        ssh ${{ inputs.SSH_HOSTNAME }} "whoami"
